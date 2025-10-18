@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тренер по Бегу</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --tg-theme-bg-color: #ffffff;
+            --tg-theme-text-color: #000000;
+            --tg-theme-button-color: #31b5e7;
+            --tg-theme-button-text-color: #ffffff;
+            --tg-theme-secondary-bg-color: #f1f2f3;
+        }
+        body {
+            background-color: var(--tg-theme-bg-color);
+            color: var(--tg-theme-text-color);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 1rem;
+            box-sizing: border-box;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .nav-button.active { 
+            background-color: var(--tg-theme-button-color);
+            color: var(--tg-theme-button-text-color);
+        }
+        .card {
+            background-color: var(--tg-theme-secondary-bg-color);
+            border-radius: 0.75rem;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div id="user-greeting" class="text-xl font-bold mb-4"></div>
+
+    <!-- Навигация -->
+    <div class="grid grid-cols-4 gap-2 mb-4">
+        <button id="nav-today" class="nav-button p-2 rounded-lg font-semibold text-sm transition-colors duration-200">Сегодня</button>
+        <button id="nav-plan" class="nav-button p-2 rounded-lg font-semibold text-sm transition-colors duration-200">План</button>
+        <button id="nav-progress" class="nav-button p-2 rounded-lg font-semibold text-sm transition-colors duration-200">Прогресс</button>
+        <button id="nav-log" class="nav-button p-2 rounded-lg font-semibold text-sm transition-colors duration-200">Запись</button>
+    </div>
+
+    <!-- Контент вкладок -->
+    <div id="content-container">
+        <!-- ВКЛАДКА: СЕГОДНЯ -->
+        <div id="tab-today" class="tab-content">
+            <div class="card">
+                <h2 class="text-lg font-bold mb-2">План на сегодня</h2>
+                <div id="today-plan-content">
+                    <p class="text-gray-500">Загрузка данных...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ВКЛАДКА: ПЛАН -->
+        <div id="tab-plan" class="tab-content">
+            <div class="card">
+                <h2 class="text-lg font-bold mb-2">Весь план тренировок</h2>
+                <div id="full-plan-container" class="space-y-3 max-h-96 overflow-y-auto">
+                    <!-- Сюда будет сгенерирован план -->
+                </div>
+            </div>
+        </div>
+
+        <!-- ВКЛАДКА: ПРОГРЕСС -->
+        <div id="tab-progress" class="tab-content">
+            <div class="card">
+                <h2 class="text-lg font-bold mb-2">Ваш прогресс</h2>
+                <div id="progress-stats" class="mb-4 text-center grid grid-cols-2 gap-4">
+                    <div>
+                        <div class="text-2xl font-bold" id="stat-total-km">0 км</div>
+                        <div class="text-sm text-gray-500">Всего пробежал</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold" id="stat-current-week">1/24</div>
+                        <div class="text-sm text-gray-500">Текущая неделя</div>
+                    </div>
+                </div>
+                <div class="chart-container relative h-64">
+                    <canvas id="progressChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- ВКЛАДКА: ЗАПИСЬ -->
+        <div id="tab-log" class="tab-content">
+            <div class="card">
+                <h2 class="text-lg font-bold mb-2">Записать тренировку</h2>
+                <form id="log-workout-form" class="space-y-4">
+                    <div>
+                        <label for="week" class="block text-sm font-medium">Номер недели</label>
+                        <input type="number" id="week" name="week" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 p-2" style="background-color: var(--tg-theme-bg-color); color: var(--tg-theme-text-color);">
+                    </div>
+                    <div>
+                        <label for="distance" class="block text-sm font-medium">Дистанция (км)</label>
+                        <input type="number" step="0.1" id="distance" name="distance" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" style="background-color: var(--tg-theme-bg-color); color: var(--tg-theme-text-color);">
+                    </div>
+                    <div>
+                        <label for="duration" class="block text-sm font-medium">Время (мин)</label>
+                        <input type="number" id="duration" name="duration" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" style="background-color: var(--tg-theme-bg-color); color: var(--tg-theme-text-color);">
+                    </div>
+                    <div>
+                        <label for="avg_hr" class="block text-sm font-medium">Средний пульс (ЧСС)</label>
+                        <input type="number" id="avg_hr" name="avg_hr" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2" style="background-color: var(--tg-theme-bg-color); color: var(--tg-theme-text-color);">
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand(); 
+
+        // --- ДАННЫЕ (пока что встроены, потом будут приходить с сервера) ---
+        const DAY_NAMES_RU = ["Воскресенье", "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота"];
+        const PLAN = [
+            {"week": 1, "phase": 1, "volume": 28, "schedule": ["5 км (разг. темп)", "Силовая: кор, ноги (45 мин)", "5 км (разг. темп)", "Отдых", "5 км (разг. темп)", "8 км (LSD)", "Отдых"]},
+            {"week": 2, "phase": 1, "volume": 30, "schedule": ["5 км (разг. темп)", "Силовая: кор, ноги (45 мин)", "6 км (разг. темп)", "Отдых", "5 км (разг. темп)", "9 км (LSD)", "Отдых"]},
+            {"week": 3, "phase": 1, "volume": 32, "schedule": ["6 км (разг. темп)", "Силовая: кор, ноги (45 мин)", "6 км (разг. темп)", "Отдых", "6 км (разг. темп)", "10 км (LSD)", "Отдых"]},
+            {"week": 4, "phase": 1, "volume": 26, "schedule": ["5 км (разг. темп)", "Восст. ОФП: растяжка, йога", "5 км (разг. темп)", "Отдых", "5 км (разг. темп)", "8 км (LSD)", "Отдых"]},
+            {"week": 5, "phase": 1, "volume": 34, "schedule": ["6 км (разг. темп)", "Силовая: кор, ноги (50 мин)", "6 км (разг. темп)", "Отдых", "6 км (разг. темп)", "12 км (LSD)", "Отдых"]},
+            {"week": 6, "phase": 1, "volume": 36, "schedule": ["7 км (разг. темп)", "Силовая: кор, ноги (50 мин)", "7 км (разг. темп)", "Отдых", "6 км (разг. темп)", "12 км (LSD)", "Отдых"]},
+            {"week": 7, "phase": 1, "volume": 38, "schedule": ["7 км (разг. темп)", "Силовая: кор, ноги (50 мин)", "7 км (разг. темп)", "Отдых", "7 км (разг. темп)", "13 км (LSD)", "Отдых"]},
+            {"week": 8, "phase": 1, "volume": 30, "schedule": ["6 км (разг. темп)", "Восст. ОФП: растяжка, йога", "6 км (разг. темп)", "Отдых", "6 км (разг. темп)", "10 км (LSD)", "Отдых"]},
+            {"week": 9, "phase": 2, "volume": 38, "schedule": ["6 км (легко)", "Силовая (60 мин)", "Интервалы: 6x400м", "Отдых", "6 км (легко)", "14 км (LSD)", "Отдых"]},
+            {"week": 10, "phase": 2, "volume": 40, "schedule": ["6 км (легко)", "Силовая (60 мин)", "Темповый бег: 3 км", "Отдых", "6 км (легко)", "15 км (LSD)", "Отдых"]},
+            {"week": 11, "phase": 2, "volume": 42, "schedule": ["6 км (легко)", "Силовая (60 мин)", "Интервалы: 8x400м", "Отдых", "6 км (легко)", "16 км (LSD)", "Отдых"]},
+            {"week": 12, "phase": 2, "volume": 35, "schedule": ["5 км (легко)", "Легкая ОФП (30 мин)", "3 км (легко) + 4 ускорения", "Отдых", "ТЕСТОВЫЙ ЗАБЕГ 10 КМ", "10 км (восст.)", "Отдых"]},
+            {"week": 13, "phase": 2, "volume": 44, "schedule": ["7 км (легко)", "Силовая (60 мин)", "Темповый бег: 4 км", "Отдых", "7 км (легко)", "16 км (LSD)", "Отдых"]},
+            {"week": 14, "phase": 2, "volume": 46, "schedule": ["7 км (легко)", "Силовая (60 мин)", "Интервалы: 4x800м", "Отдых", "7 км (легко)", "18 км (LSD)", "Отдых"]},
+            {"week": 15, "phase": 2, "volume": 48, "schedule": ["8 км (легко)", "Силовая (60 мин)", "Темповый бег: 5 км", "Отдых", "7 км (легко)", "18 км (LSD)", "Отдых"]},
+            {"week": 16, "phase": 2, "volume": 40, "schedule": ["6 км (легко)", "Восст. ОФП: растяжка, йога", "6 км (легко)", "Отдых", "6 км (легко)", "14 км (LSD)", "Отдых"]},
+            {"week": 17, "phase": 3, "volume": 50, "schedule": ["8 км (легко)", "Силовая (45 мин)", "ПМ-темп: 2x3км", "Отдых", "7 км (легко)", "20 км (LSD)", "Отдых"]},
+            {"week": 18, "phase": 3, "volume": 52, "schedule": ["8 км (легко)", "Силовая (45 мин)", "Интервалы: 5x800м", "Отдых", "8 км (легко)", "18 км (LSD, финиш в темпе ПМ)", "Отдых"]},
+            {"week": 19, "phase": 3, "volume": 54, "schedule": ["8 км (легко)", "Легкая ОФП (30 мин)", "ПМ-темп: 8 км", "Отдых", "8 км (легко)", "20 км (LSD)", "Отдых"]},
+            {"week": 20, "phase": 3, "volume": 44, "schedule": ["7 км (легко)", "Восст. ОФП: растяжка", "Темповый бег: 4 км", "Отдых", "7 км (легко)", "16 км (LSD)", "Отдых"]},
+            {"week": 21, "phase": 4, "volume": 38, "schedule": ["6 км (легко)", "Легкая ОФП / Отдых", "ПМ-темп: 5 км", "Отдых", "6 км (легко)", "15 км (LSD)", "Отдых"]},
+            {"week": 22, "phase": 4, "volume": 32, "schedule": ["5 км (легко)", "Отдых", "Интервалы: 4x400м", "Отдых", "5 км (легко)", "12 км (LSD)", "Отдых"]},
+            {"week": 23, "phase": 4, "volume": 25, "schedule": ["5 км (легко)", "Отдых", "5 км (легко)", "Отдых", "5 км (легко)", "8 км (LSD)", "Отдых"]},
+            {"week": 24, "phase": 4, "volume": 29.1, "schedule": ["5 км (очень легко)", "Отдых", "3 км + 4 ускорения", "Отдых", "Отдых", "ПОЛУМАРАФОН 21.1 КМ", "Празднование!"]},
+        ];
+        
+        // --- ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ ---
+        let userData = {
+            current_week: 1,
+            workouts: []
+        };
+        let progressChartInstance = null;
+
+        // --- ЛОГИКА ПРИЛОЖЕНИЯ ---
+
+        document.addEventListener('DOMContentLoaded', () => {
+            setupNavigation();
+            loadUserData();
+            displayFullPlan();
+
+            document.getElementById('user-greeting').textContent = `Привет, ${tg.initDataUnsafe?.user?.first_name || 'Спортсмен'}!`;
+            
+            tg.MainButton.setText('СОХРАНИТЬ ТРЕНИРОВКУ');
+            tg.MainButton.onClick(() => {
+                document.getElementById('log-workout-form').requestSubmit();
+            });
+        });
+        
+        function setupNavigation() {
+            const navButtons = document.querySelectorAll('.nav-button');
+            const tabContents = document.querySelectorAll('.tab-content');
+
+            function switchTab(tabId) {
+                tabContents.forEach(content => {
+                    content.classList.remove('active');
+                });
+                navButtons.forEach(button => {
+                    button.classList.remove('active');
+                });
+
+                document.getElementById(`tab-${tabId}`).classList.add('active');
+                document.getElementById(`nav-${tabId}`).classList.add('active');
+                
+                if (tabId === 'log') {
+                    tg.MainButton.show();
+                } else {
+                    tg.MainButton.hide();
+                }
+            }
+
+            navButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const tabId = button.id.split('-')[1];
+                    switchTab(tabId);
+                });
+            });
+
+            switchTab('today');
+        }
+
+        async function loadUserData() {
+            // TODO: Заменить на fetch к реальному бэкенду
+            // const response = await fetch('https://your-backend-url/api/user_data?initData=' + tg.initData);
+            // userData = await response.json();
+            
+            // Пока используем моковые (тестовые) данные
+            userData.workouts = [
+                { week: 1, distance: 5 }, { week: 1, distance: 5 }, { week: 1, distance: 8 },
+                { week: 2, distance: 5 }, { week: 2, distance: 6 }, { week: 2, distance: 9 },
+            ];
+            userData.current_week = 3;
+
+            updateUI();
+        }
+        
+        function updateUI() {
+            displayTodayPlan();
+            updateProgressStats();
+            renderProgressChart();
+            document.getElementById('week').value = userData.current_week;
+        }
+
+        function displayTodayPlan() {
+            const todayIndex = new Date().getDay(); // 0 = Вс, 1 = Пн
+            const weekData = PLAN.find(w => w.week === userData.current_week);
+            const contentEl = document.getElementById('today-plan-content');
+            
+            if (weekData) {
+                const schedule = weekData.schedule[todayIndex === 0 ? 6 : todayIndex -1]; // Адаптация под массив 0=Пн
+                contentEl.innerHTML = `
+                    <p><span class="font-semibold">Неделя:</span> ${userData.current_week}</p>
+                    <p><span class="font-semibold">Задание:</span> ${schedule}</p>
+                `;
+            } else {
+                contentEl.innerHTML = `<p>План завершен! Поздравляем!</p>`;
+            }
+        }
+        
+        function displayFullPlan() {
+            const container = document.getElementById('full-plan-container');
+            let html = '';
+            PLAN.forEach(week => {
+                html += `
+                    <div>
+                        <h3 class="font-bold">Неделя ${week.week} (Объем: ${week.volume} км)</h3>
+                        <ul class="list-disc list-inside text-sm text-gray-600">
+                            ${week.schedule.map((s, i) => `<li><b>${DAY_NAMES_RU[i+1] || DAY_NAMES_RU[0]}:</b> ${s}</li>`).join('')}
+                        </ul>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function updateProgressStats() {
+            const totalKm = userData.workouts.reduce((sum, w) => sum + w.distance, 0);
+            document.getElementById('stat-total-km').textContent = `${totalKm.toFixed(1)} км`;
+            document.getElementById('stat-current-week').textContent = `${userData.current_week}/24`;
+        }
+
+        function renderProgressChart() {
+            const ctx = document.getElementById('progressChart').getContext('2d');
+            const plannedVolumes = PLAN.map(w => w.volume);
+            const actualVolumes = [];
+            for (let i = 1; i <= 24; i++) {
+                const weekWorkouts = userData.workouts.filter(w => w.week === i);
+                const totalDist = weekWorkouts.reduce((sum, w) => sum + w.distance, 0);
+                actualVolumes.push(totalDist > 0 ? totalDist : null);
+            }
+
+            if(progressChartInstance) {
+                progressChartInstance.destroy();
+            }
+
+            progressChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: 24}, (_, i) => `Н${i + 1}`),
+                    datasets: [{
+                        label: 'Плановый объем (км)',
+                        data: plannedVolumes,
+                        borderColor: 'rgba(54, 162, 235, 0.5)',
+                        backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                        fill: false,
+                        borderDash: [5, 5],
+                    }, {
+                        label: 'Фактический объем (км)',
+                        data: actualVolumes,
+                        borderColor: 'rgb(75, 192, 192)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        fill: true,
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+        
+        document.getElementById('log-workout-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+            
+            // TODO: Отправка данных на бэкенд
+            // const response = await fetch('https://your-backend-url/api/log_workout', {
+            //     method: 'POST',
+            //     headers: { 'Content-Type': 'application/json' },
+            //     body: JSON.stringify({ ...data, initData: tg.initData })
+            // });
+            // if (response.ok) {
+            //     tg.close();
+            // } else {
+            //     tg.showAlert('Ошибка при сохранении. Попробуйте снова.');
+            // }
+            
+            console.log('Отправка данных на сервер:', data);
+            tg.showAlert(`Тренировка за неделю ${data.week} сохранена (демо-режим)!`);
+            // В реальном приложении после успешного сохранения окно закроется
+            // tg.close();
+        });
+
+    </script>
+</body>
+</html>
