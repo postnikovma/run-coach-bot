@@ -2,7 +2,6 @@
 
 import logging
 import os
-import asyncio # <-- Добавлен asyncio
 from datetime import time, date
 from telegram import Update
 from telegram.ext import (
@@ -35,7 +34,6 @@ async def send_daily_reminder(context: ContextTypes.DEFAULT_TYPE) -> None:
     current_week = db.get_user_current_week(user_id)
     if current_week > 24:
         await context.bot.send_message(job.chat_id, text="Поздравляю! План тренировок полностью завершен! 🏆")
-        # Удаляем задачу, чтобы больше не приходили напоминания
         job.schedule_removal()
         return
 
@@ -63,12 +61,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user_id = user.id
     db.add_user(user_id)
 
-    # Удаляем старую задачу, если она есть, чтобы избежать дублирования
     current_jobs = context.job_queue.get_jobs_by_name(f"reminder_{user_id}")
     for job in current_jobs:
         job.schedule_removal()
 
-    # Настройка ежедневного напоминания
     context.job_queue.run_daily(
         send_daily_reminder,
         time=time(hour=8, minute=0),
@@ -218,7 +214,7 @@ async def show_progress(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     )
     await update.message.reply_text(message, parse_mode='HTML')
 
-async def main() -> None: # <-- Функция стала async
+def main() -> None: # <-- Убрали async отсюда
     """Основная функция для запуска бота."""
     TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
     if not TELEGRAM_TOKEN:
@@ -246,8 +242,8 @@ async def main() -> None: # <-- Функция стала async
     application.add_handler(conv_handler)
     
     logger.info("Бот запущен...")
-    await application.run_polling()
+    application.run_polling() # <-- Убрали await отсюда
 
 if __name__ == "__main__":
-    asyncio.run(main()) # <-- Изменен способ запуска
+    main() # <-- Запускаем main() напрямую, без asyncio.run()
 
